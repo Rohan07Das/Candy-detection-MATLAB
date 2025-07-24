@@ -1,0 +1,70 @@
+% For showing image filename and multiple classes (columns)
+
+% Load class names
+classFile = 'C:/yolo/candyimages/classes.txt';
+classNames = strtrim(readlines(classFile));
+
+% Set paths
+imgDir = 'C:/yolo/candyimages/images';
+labelDir = 'C:/yolo/candyimages/labels';
+
+% Get all image files
+imgFiles = dir(fullfile(imgDir, '*.jpg'));
+numFiles = numel(imgFiles);
+
+% Initialize storage
+imageFilename = {};
+labelData = {};  % Now correctly using cell array
+
+for i = 1:numFiles
+    % Get image and label paths
+    imgName = imgFiles(i).name;
+    imgPath = fullfile(imgDir, imgName);
+labelPath = fullfile(labelDir, replace(imgName, '.jpg', '.txt'));
+
+    % Read image size
+    I = imread(imgPath);
+    [h, w, ~] = size(I);
+
+    % Empty bounding boxes for each class
+    bboxPerClass = cell(1, numel(classNames));
+    for k = 1:numel(classNames)
+        bboxPerClass{k} = zeros(0, 4);  % empty matrix for each class
+    end
+
+    % Read YOLO label file
+    if isfile(labelPath)
+        lines = readlines(labelPath);
+        for j = 1:numel(lines)
+            vals = str2double(split(lines(j)));
+            if numel(vals) < 5, continue; end
+
+            classIdx = vals(1) + 1;  % 1-indexed for MATLAB
+            if classIdx > numel(classNames), continue; end
+
+            % Convert normalized YOLO to absolute [x y w h]
+            x_center = vals(2) * w;
+  y_center = vals(3) * h;
+            box_w = vals(4) * w;
+            box_h = vals(5) * h;
+
+            x = x_center - box_w / 2;
+            y = y_center - box_h / 2;
+
+            % Store in correct class
+            bboxPerClass{classIdx} = [bboxPerClass{classIdx}; x, y, box_w, box_h];
+        end
+    end
+
+    % Append image path and label data
+    imageFilename{end+1, 1} = imgPath;
+    labelData(end+1, :) = bboxPerClass;  % Cell assignment works now
+end
+
+% Final dataset table
+candyDataset = cell2table([imageFilename, labelData], ...
+    'VariableNames', ["imageFilename"; classNames]);
+
+% Save
+save('C:/yolo/candyDataset.mat', 'candyDataset');
+disp("✅ Saved to C:/yolo/candyDataset.mat");
